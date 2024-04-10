@@ -15,6 +15,7 @@ from django.conf import settings
 from collections import namedtuple
 from github import Github
 from github import InputGitTreeElement
+from urllib.parse import quote
 import shutil
 from .constants import CLONE_ACCEPT_HEADER
 from base64 import b64encode
@@ -269,7 +270,7 @@ def clone_repository(config, params, *args, **kwargs):
             save_file_in_env(env, zip_file)
             return {"path": zip_file}
         else:
-            unzip_file_path = '/tmp/{0}-{1}'.format(params.get('name'), params.get('branch'))
+            unzip_file_path = '/tmp/{0}-{1}'.format(params.get('name'), params.get('branch').replace('/', '-'))
             with zipfile.ZipFile(zip_file, "r") as zip_ref:
                 zip_ref.extractall(settings.TMP_FILE_ROOT)
             save_file_in_env(env, unzip_file_path)
@@ -558,6 +559,15 @@ def set_repo_subscription(config, params, *args, **kwargs):
                                owner=params.get('owner'))
 
 
+def search_repo(config, params, *args, **kwargs):
+    github = GitHub(config)
+    payload = {k: v for k, v in params.items() if
+               v is not None and v != '' and v != {} and v != []}
+    payload.update({"sort": "created", "order": "desc", "q": quote(params.get('q'), safe="")})
+    endpoint = f"search/code?q={params.get('q')}&type={params.get('type', 'Code')}&order=desc&sort=modified&per_page={params.get('per_page', 5)}&page={params.get('page', 1)}"
+    return github.make_request(method='GET', endpoint=endpoint)
+
+
 def _check_health(config):
     try:
         github = GitHub(config)
@@ -622,5 +632,6 @@ operations = {
     'star_repository': star_repository,
     'list_watchers': list_watchers,
     'set_repo_subscription': set_repo_subscription,
-    'get_web_url': get_web_url
+    'get_web_url': get_web_url,
+    "search_repo": search_repo
 }
